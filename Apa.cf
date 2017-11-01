@@ -1,0 +1,16 @@
+ELS. Exp 	::= Exp "<<" Exp1 ;
+ERS. Exp 	::= Exp ">>" Exp1 ;
+EQC. Exp1 	::= Exp1 "::" Exp1 ;
+ELit. Exp1	::= Lit ;
+
+coercions Exp 1 ;
+
+LInt. Lit ::= Integer ;
+LString. Lit ::= String ;
+
+Id. Identifier ::= Ident ;
+
+PreDir. Com ::= "#" String "\n" ;
+
+comment "//" ;
+comment "/*" "*/" ;
