@@ -2,6 +2,7 @@ ProgDef. Program ::= [Definition] ;
 terminator Definition "";
 
 Func. Definition ::= DataType Identifier Args FunctionBody ;
+Using. Definition ::= "using" QConst ";" ;
 
 FBody. FunctionBody  ::= "{" [Stm] "}" ;
 terminator Stm "" ;
@@ -11,13 +12,20 @@ Argument. Argument ::= DataType Identifier ;
 ArgumentList. Args ::= "(" [Argument] ")" ;
 separator Argument ",";
 
-ExpStatement. Stm ::= Exp ";" ;
-RetStatement. Stm ::= "return" Exp ";" ;
+ExpStatement.   Stm ::= Exp ";" ;
+RetStatement.   Stm ::= "return" Exp ";" ;
+VarDec.         Stm ::= DataType [Dec] ";" ;
+separator nonempty Dec "," ;
+
+Dec. Dec ::= Identifier ;
+Def. Dec ::= Identifier "=" Exp ;
+
 
 ELS.  Exp 	::= Exp "<<" Exp1 ;
 ERS.  Exp 	::= Exp ">>" Exp1 ;
-EQC.  Exp1 	::= QConst ;
+EQC.  Exp1 	::= [QConst] ;
 ELit. Exp1	::= Lit ;
+separator nonempty QConst "," ;
 
 coercions Exp 1 ;
 
@@ -26,6 +34,7 @@ Bool.   DataType ::= "bool" ;
 Char.   DataType ::= "char" ;
 Double. DataType ::= "double" ;
 Void.   DataType ::= "void" ;
+QConst1. DataType ::= QConst ; --is ok?
 
 
 QConst.    QConst ::= [Identifier] ;
@@ -34,9 +43,9 @@ separator nonempty Identifier "::" ;
 LInt. Lit ::= Integer ;
 LString. Lit ::= String ;
 
-Id. Identifier ::= Ident ;
+position token Identifier (letter ( letter | digit | '_')*) ;
 
-PreDir. Com ::= "#" String "\n" ;
 
+comment "#" ;
 comment "//" ;
 comment "/*" "*/" ;
