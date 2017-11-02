@@ -1,27 +1,18 @@
-Prog1. Program  ::= Program1 ;
-Prog2. Program1 ::= Program2 Program1 ;
-Prog3. Program1 ::= Program2 ;
-Prog4. Program2 ::= Definition ;
+ProgDef. Program ::= [Definition] ;
+terminator Definition "";
 
 Func. Definition ::= DataType Identifier Args FunctionBody ;
 
-FBody1. FunctionBody  ::= "{" FunctionBody1 "}" ;
-FBody2. FunctionBody  ::= "{\n" FunctionBody1 "\n}" ;
-FBody3. FunctionBody1 ::= FunctionBody2 "\n" FunctionBody1 ;
-FBody4. FunctionBody1 ::= FunctionBody2 " " FunctionBody1 ;
-FBody5. FunctionBody1 ::= FunctionBody2 ;
-FBody6. FunctionBody2 ::= Stm ;
+FBody. FunctionBody  ::= "{" [Stm] "}" ;
+terminator Stm "" ;
 
 Argument. Argument ::= DataType Identifier ;
 
-ArgumentList1. Args ::= "(" Args1 ")" ;
-ArgumentList2. Args1 ::= Args2 "," Args1;
-ArgumentList3. Args1 ::= Args2 ;
-ArgumentList4. Args2 ::= Argument ;
+ArgumentList. Args ::= "(" [Argument] ")" ;
+separator Argument ",";
 
-Statement1. Stm ::= Stm ";" ;
-Statement2. Stm ::= Exp ";" ;
-Statement3. Stm ::= "return" Exp ";" ;
+ExpStatement. Stm ::= Exp ";" ;
+RetStatement. Stm ::= "return" Exp ";" ;
 
 ELS.  Exp 	::= Exp "<<" Exp1 ;
 ERS.  Exp 	::= Exp ">>" Exp1 ;
@@ -37,8 +28,8 @@ Double. DataType ::= "double" ;
 Void.   DataType ::= "void" ;
 
 
-QConstSuc. QConst ::= Identifier "::" QConst ;
-QConst.    QConst ::= Identifier ;
+QConst.    QConst ::= [Identifier] ;
+separator nonempty Identifier "::" ;
 
 LInt. Lit ::= Integer ;
 LString. Lit ::= String ;
