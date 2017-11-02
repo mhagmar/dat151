@@ -1,9 +1,4 @@
-# BNFC generated files
-*.bak
-*.hs
-*.txt
-*.x
-*.y
+
 
 # Created by https://www.gitignore.io/api/emacs,haskell
 
@@ -167,3 +162,9 @@ fabric.properties
 
 # End of https://www.gitignore.io/api/intellij
 
+# BNFC generated files
+*.bak
+*.hs
+*.txt
+*.x
+*.y
