@@ -15,7 +15,15 @@ separator Argument ",";
 ExpStatement.   Stm ::= Exp ";" ;
 RetStatement.   Stm ::= "return" Exp ";" ;
 VarDec.         Stm ::= DataType [Dec] ";" ;
+While. 			Stm ::= "while" "(" Exp ")" Stm ;
+DoWhile. 		Stm ::= "do" Stm "while" "(" Exp ")" ";" ;
+Condit. 		Stm ::= Conditional;
+Curls. 			Stm ::= "{" [Stm] "}" ;
+TypeDef. 		Stm ::= "typedef" DataType Identifier ;
 separator nonempty Dec "," ;
+
+If. 	Conditional ::= "if" "(" Exp ")" Stm ;
+IfElse. Conditional ::= "if" "(" Exp ")" Stm "else" Stm ;
 
 Dec. Dec ::= Identifier ;
 Def. Dec ::= Identifier "=" Exp ;
@@ -32,7 +40,9 @@ coercions Exp 1 ;
 Int.    DataType ::= "int" ;
 Bool.   DataType ::= "bool" ;
 Char.   DataType ::= "char" ;
+String. DataType ::= "string" ;
 Double. DataType ::= "double" ;
+Float. 	DataType ::= "float" ;
 Void.   DataType ::= "void" ;
 QConst1. DataType ::= QConst ; --is ok?
 
@@ -41,6 +51,7 @@ QConst.    QConst ::= [Identifier] ;
 separator nonempty Identifier "::" ;
 
 LInt. Lit ::= Integer ;
+LFloat. Lit ::= Double ;
 LString. Lit ::= String ;
 
 position token Identifier (letter ( letter | digit | '_')*) ;
