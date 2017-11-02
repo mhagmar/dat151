@@ -29,13 +29,31 @@ Dec. Dec ::= Identifier ;
 Def. Dec ::= Identifier "=" Exp ;
 
 
-ELS.  Exp 	::= Exp "<<" Exp1 ;
-ERS.  Exp 	::= Exp ">>" Exp1 ;
-EQC.  Exp1 	::= [QConst] ;
-ELit. Exp1	::= Lit ;
+EDAs.       Exp2  ::= Identifier "-+" Exp2 ;
+EIAs.       Exp2  ::= Identifier "+=" Exp2 ;
+EAss.       Exp2  ::= Identifier "=" Exp2 ;
+ENeq        Exp8  ::= Exp8 "!=" Exp9;
+EEq.        Exp8  ::= Exp8 "==" Exp9;
+ELS.        Exp10 ::= Exp10 "<<" Exp11 ;
+ERS.        Exp10 ::= Exp10 ">>" Exp11 ;
+EAdd.       Exp11 ::= Exp11 "+" Exp12;
+ESub.       Exp11 ::= Exp11 "-" Exp12;
+EMul.       Exp12 ::= Exp12 "*" Exp13;
+EDiv.       Exp12 ::= Exp12 "/" Exp13;
+ERem.       Exp12 ::= Exp12 "%" Exp13;
+Arrow.      Exp14 ::= Exp14 "->" Exp15 ;
+Dot.        Exp14 ::= Exp14 "." Exp15 ;
+Indx.       Exp15 ::= Exp15 "[" Exp16 "]" ;
+FuncCall.   Exp15 ::= Identifier "(" [Exp16] ")" ;
+EQC.        Exp16 ::= [QConst] ;
+ELit.       Exp16 ::= Lit ;
+separator Exp "," ;
 separator nonempty QConst "," ;
 
-coercions Exp 1 ;
+coercions Exp 16 ;
+
+Arrow. StProj ::= Exp "->" Exp ;
+Dot.   StProj ::= Exp "." Exp ;
 
 Int.    DataType ::= "int" ;
 Bool.   DataType ::= "bool" ;
