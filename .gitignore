@@ -168,6 +168,7 @@ fabric.properties
 *.o
 *.y
 *.x
+*.bak
 Test*
 Makefile
 /test-files
