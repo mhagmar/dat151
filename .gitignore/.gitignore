@@ -1,3 +1,9 @@
+# BNFC generated files
+*.bak
+*.hs
+*.txt
+*.x
+*.y
 
 # Created by https://www.gitignore.io/api/emacs,haskell
 
