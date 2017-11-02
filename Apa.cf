@@ -1,9 +1,44 @@
-ELS. Exp 	::= Exp "<<" Exp1 ;
-ERS. Exp 	::= Exp ">>" Exp1 ;
-EQC. Exp1 	::= Exp1 "::" Exp1 ;
+Prog1. Program  ::= Program1 ;
+Prog2. Program1 ::= Program2 Program1 ;
+Prog3. Program1 ::= Program2 ;
+Prog4. Program2 ::= Definition ;
+
+Func. Definition ::= DataType Identifier Args FunctionBody ;
+
+FBody1. FunctionBody  ::= "{" FunctionBody1 "}" ;
+FBody2. FunctionBody  ::= "{\n" FunctionBody1 "\n}" ;
+FBody3. FunctionBody1 ::= FunctionBody2 "\n" FunctionBody1 ;
+FBody4. FunctionBody1 ::= FunctionBody2 " " FunctionBody1 ;
+FBody5. FunctionBody1 ::= FunctionBody2 ;
+FBody6. FunctionBody2 ::= Stm ;
+
+Argument. Argument ::= DataType Identifier ;
+
+ArgumentList1. Args ::= "(" Args1 ")" ;
+ArgumentList2. Args1 ::= Args2 "," Args1;
+ArgumentList3. Args1 ::= Args2 ;
+ArgumentList4. Args2 ::= Argument ;
+
+Statement1. Stm ::= Stm ";" ;
+Statement2. Stm ::= Exp ";" ;
+Statement3. Stm ::= "return" Exp ";" ;
+
+ELS.  Exp 	::= Exp "<<" Exp1 ;
+ERS.  Exp 	::= Exp ">>" Exp1 ;
+EQC.  Exp1 	::= QConst ;
 ELit. Exp1	::= Lit ;
 
 coercions Exp 1 ;
+
+Int.    DataType ::= "int" ;
+Bool.   DataType ::= "bool" ;
+Char.   DataType ::= "char" ;
+Double. DataType ::= "double" ;
+Void.   DataType ::= "void" ;
+
+
+QConstSuc. QConst ::= Identifier "::" QConst ;
+QConst.    QConst ::= Identifier ;
 
 LInt. Lit ::= Integer ;
 LString. Lit ::= String ;
