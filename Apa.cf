@@ -3,11 +3,16 @@ terminator Definition "";
 
 Func. Definition ::= DataType Identifier Args FunctionBody ;
 Using. Definition ::= "using" QConst ";" ;
+DeftypeDef. Definition ::= TypeDef ;
 
-FBody. FunctionBody  ::= "{" [Stm] "}" ;
+FBody. 		FunctionBody  ::= "{" [Stm] "}" ;
+EmptyBody. 	FunctionBody ::= ";" ;
 terminator Stm "" ;
 
-Argument. Argument ::= DataType Identifier ;
+TypeDec.  Argument1 ::= DataType ;
+Argument. Argument1 ::= DataType Dec ;
+Const. 	  Argument  ::= "const" Argument1 ;
+coercions Argument 1;
 
 ArgumentList. Args ::= "(" [Argument] ")" ;
 separator Argument ",";
@@ -15,12 +20,16 @@ separator Argument ",";
 ExpStatement.   Stm ::= Exp ";" ;
 RetStatement.   Stm ::= "return" Exp ";" ;
 VarDec.         Stm ::= DataType [Dec] ";" ;
+ConstVarDec.    Stm ::= "const" DataType [Dec] ";" ;
 While. 			Stm ::= "while" "(" Exp ")" Stm ;
 DoWhile. 		Stm ::= "do" Stm "while" "(" Exp ")" ";" ;
+For. 			Stm ::= "for" "(" Stm Stm Exp ")" Stm ;
 Condit. 		Stm ::= Conditional;
 Curls. 			Stm ::= "{" [Stm] "}" ;
-TypeDef. 		Stm ::= "typedef" DataType Identifier ";" ;
+StmTypeDef. 	Stm ::= TypeDef ;
 separator nonempty Dec "," ;
+
+TypeDef. TypeDef ::= "typedef" DataType Identifier ";" ;
 
 If. 	Conditional ::= "if" "(" Exp ")" Stm ;
 IfElse. Conditional ::= "if" "(" Exp ")" Stm "else" Stm ;
@@ -28,12 +37,20 @@ IfElse. Conditional ::= "if" "(" Exp ")" Stm "else" Stm ;
 Dec. Dec ::= Identifier ;
 Def. Dec ::= Identifier "=" Exp ;
 
-ECon.       Exp2  ::= Exp3 ":" Exp3 "?" Exp2 ;
+
+EThrow.		Exp1  ::= "throw" Exp2 ;
+ECond.      Exp2  ::= Exp2 "?" Exp3 ":" Exp3 ;
 EDAs.       Exp2  ::= Identifier "-=" Exp2 ;
 EIAs.       Exp2  ::= Identifier "+=" Exp2 ;
 EAss.       Exp2  ::= Identifier "=" Exp2 ;
+EDis.		Exp3  ::= Exp3 "||" Exp4 ;
+ECon. 		Exp4  ::= Exp4 "&&" Exp5 ;
 ENeq.       Exp8  ::= Exp8 "!=" Exp9;
 EEq.        Exp8  ::= Exp8 "==" Exp9;
+ELT. 		Exp9  ::= Exp9 "<" Exp10 ;
+EGT. 		Exp9  ::= Exp9 ">" Exp10 ;
+ELeq. 		Exp9  ::= Exp9 "<=" Exp10 ;
+EGeq. 		Exp9  ::= Exp9 ">=" Exp10 ;
 ELS.        Exp10 ::= Exp10 "<<" Exp11 ;
 ERS.        Exp10 ::= Exp10 ">>" Exp11 ;
 EAdd.       Exp11 ::= Exp11 "+" Exp12;
@@ -41,24 +58,27 @@ ESub.       Exp11 ::= Exp11 "-" Exp12;
 EMul.       Exp12 ::= Exp12 "*" Exp13;
 EDiv.       Exp12 ::= Exp12 "/" Exp13;
 ERem.       Exp12 ::= Exp12 "%" Exp13;
+EPPE. 		Exp13 ::= "++" Exp13 ;
+EMME. 		Exp13 ::= "--" Exp13 ;
+EDRF.		Exp13 ::= "*" Exp13 ;
+ENeg.		Exp13 ::= "!" Exp13 ;
 Arrow.      Exp14 ::= Exp14 "->" Exp15 ;
 Dot.        Exp14 ::= Exp14 "." Exp15 ;
 Indx.       Exp15 ::= Exp15 "[" Exp "]" ;
-FuncCall.   Exp15 ::= Identifier "(" [Exp] ")" ;
-EQC.        Exp16 ::= [QConst] ;
+FuncCall.   Exp15 ::= Identifier "(" [Exp1] ")" ;
+EQC.        Exp16 ::= QConst ;
 ELit.       Exp16 ::= Lit ;
-separator Exp "," ;
-separator nonempty QConst "," ;
+separator Exp1 "," ;
 coercions Exp 16 ;
 
 Int.    DataType ::= "int" ;
 Bool.   DataType ::= "bool" ;
 Char.   DataType ::= "char" ;
-String. DataType ::= "string" ;
 Double. DataType ::= "double" ;
 Float. 	DataType ::= "float" ;
 Void.   DataType ::= "void" ;
 QConst1. DataType ::= QConst ; --is ok?
+Ref.	DataType ::= DataType "&" ;
 
 
 QConst.    QConst ::= [Identifier] ;
@@ -66,6 +86,7 @@ separator nonempty Identifier "::" ;
 
 LInt. Lit ::= Integer ;
 LFloat. Lit ::= Double ;
+LChar. Lit ::= Char ;
 LString. Lit ::= [StringPrime] ;
 separator nonempty StringPrime "\n";
 
