@@ -4,32 +4,37 @@ terminator Definition "";
 Func. Definition ::= DataType Identifier Args FunctionBody ;
 Using. Definition ::= "using" QConst ";" ;
 DeftypeDef. Definition ::= TypeDef ;
+Vardec.     Definition ::= VarDec ";" ;
 
 FBody. 		FunctionBody  ::= "{" [Stm] "}" ;
 EmptyBody. 	FunctionBody ::= ";" ;
 terminator Stm "" ;
 
-TypeDec.  Argument1 ::= DataType ;
-Argument. Argument1 ::= DataType Dec ;
-Const. 	  Argument  ::= "const" Argument1 ;
-coercions Argument 1;
+TypeDec.  Argument ::= DataType ;
+Argument. Argument ::= DataType Dec ;
+ConstArg. Argument ::= "const" DataType;
+ConstDec. Argument ::= "const" DataType Dec ;
+
 
 ArgumentList. Args ::= "(" [Argument] ")" ;
 separator Argument ",";
 
 ExpStatement.   Stm ::= Exp ";" ;
 RetStatement.   Stm ::= "return" Exp ";" ;
-VarDec.         Stm ::= DataType [Dec] ";" ;
-ConstVarDec.    Stm ::= "const" DataType [Dec] ";" ;
+VarDeDec.       Stm ::= VarDec ";" ;
 While. 			Stm ::= "while" "(" Exp ")" Stm ;
 DoWhile. 		Stm ::= "do" Stm "while" "(" Exp ")" ";" ;
-For. 			Stm ::= "for" "(" Stm Stm Exp ")" Stm ;
+For. 			Stm ::= "for" "(" VarDec ";" Exp ";" Exp ")" Stm ;
 Condit. 		Stm ::= Conditional;
 Curls. 			Stm ::= "{" [Stm] "}" ;
 StmTypeDef. 	Stm ::= TypeDef ;
 separator nonempty Dec "," ;
 
 TypeDef. TypeDef ::= "typedef" DataType Identifier ";" ;
+
+VarDec.         VarDec ::= DataType [Dec] ;
+ConstVarDec.    VarDec ::= "const" DataType [Dec] ;
+separator nonempty Dec "," ;
 
 If. 	Conditional ::= "if" "(" Exp ")" Stm ;
 IfElse. Conditional ::= "if" "(" Exp ")" Stm "else" Stm ;
@@ -38,11 +43,11 @@ Dec. Dec ::= Identifier ;
 Def. Dec ::= Identifier "=" Exp ;
 
 
-EThrow.		Exp1  ::= "throw" Exp2 ;
+EThrow.		Exp1  ::= "throw" Exp1 ;
 ECond.      Exp2  ::= Exp2 "?" Exp3 ":" Exp3 ;
-EDAs.       Exp2  ::= Identifier "-=" Exp2 ;
-EIAs.       Exp2  ::= Identifier "+=" Exp2 ;
-EAss.       Exp2  ::= Identifier "=" Exp2 ;
+EDAs.       Exp2  ::= Exp2 "-=" Exp2 ;
+EIAs.       Exp2  ::= Exp2 "+=" Exp2 ;
+EAss.       Exp2  ::= Exp2 "=" Exp2 ;
 EDis.		Exp3  ::= Exp3 "||" Exp4 ;
 ECon. 		Exp4  ::= Exp4 "&&" Exp5 ;
 ENeq.       Exp8  ::= Exp8 "!=" Exp9;
@@ -60,12 +65,14 @@ EDiv.       Exp12 ::= Exp12 "/" Exp13;
 ERem.       Exp12 ::= Exp12 "%" Exp13;
 EPPE. 		Exp13 ::= "++" Exp13 ;
 EMME. 		Exp13 ::= "--" Exp13 ;
+EEPP. 		Exp13 ::= Exp13 "++" ;
+EEMM. 		Exp13 ::= Exp13 "--" ;
 EDRF.		Exp13 ::= "*" Exp13 ;
 ENeg.		Exp13 ::= "!" Exp13 ;
 Arrow.      Exp14 ::= Exp14 "->" Exp15 ;
 Dot.        Exp14 ::= Exp14 "." Exp15 ;
 Indx.       Exp15 ::= Exp15 "[" Exp "]" ;
-FuncCall.   Exp15 ::= Identifier "(" [Exp1] ")" ;
+FuncCall.   Exp15 ::= Exp15 "(" [Exp1] ")" ;
 EQC.        Exp16 ::= QConst ;
 ELit.       Exp16 ::= Lit ;
 separator Exp1 "," ;
