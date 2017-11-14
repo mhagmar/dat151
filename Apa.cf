@@ -1,8 +1,8 @@
 ProgDef. Program ::= [Definition] ;
 terminator Definition "";
 
-Func. Definition ::= DataType Identifier Args FunctionBody ;
-Using. Definition ::= "using" QConst ";" ;
+Func.       Definition ::= DataType Identifier Args FunctionBody ;
+Using.      Definition ::= "using" QConst ";" ;
 DeftypeDef. Definition ::= TypeDef ;
 Vardec.     Definition ::= VarDec ";" ;
 
@@ -78,27 +78,27 @@ ELit.       Exp16 ::= Lit ;
 separator Exp1 "," ;
 coercions Exp 16 ;
 
-Int.    DataType ::= "int" ;
-Bool.   DataType ::= "bool" ;
-Char.   DataType ::= "char" ;
-Double. DataType ::= "double" ;
-Float. 	DataType ::= "float" ;
-Void.   DataType ::= "void" ;
-QConst1. DataType ::= QConst ; --is ok?
-Ref.	DataType ::= DataType "&" ;
+Int.        DataType ::= "int" ;
+Bool.       DataType ::= "bool" ;
+Char.       DataType ::= "char" ;
+Double.     DataType ::= "double" ;
+Float.  	DataType ::= "float" ;
+Void.       DataType ::= "void" ;
+QConst1.    DataType ::= QConst ; --is ok?
+Ref.	    DataType ::= DataType "&" ;
 
 
 QConst.    QConst ::= [Identifier] ;
 separator nonempty Identifier "::" ;
 
-LInt. Lit ::= Integer ;
-LFloat. Lit ::= Double ;
-LChar. Lit ::= Char ;
-LString. Lit ::= [StringPrime] ;
+LInt.       Lit ::= Integer ;
+LFloat.     Lit ::= Double ;
+LChar.      Lit ::= Char ;
+LString.    Lit ::= [StringPrime] ;
 separator nonempty StringPrime "\n";
 
-ConcSpace. StringPrime  ::= String  StringPrime ;
-Base.      StringPrime  ::= String ;
+ConcSpace. StringPrime ::= String  StringPrime ;
+Base.      StringPrime ::= String ;
 
 
 position token Identifier (letter ( letter | digit | '_')*) ;
