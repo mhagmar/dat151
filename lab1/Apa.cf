@@ -28,7 +28,7 @@ For. 			Stm ::= "for" "(" VarDec ";" Exp ";" Exp ")" Stm ;
 Condit. 		Stm ::= Conditional;
 Curls. 			Stm ::= "{" [Stm] "}" ;
 StmTypeDef. 	Stm ::= TypeDef ;
-separator nonempty Dec "," ;
+--separator nonempty Dec "," ;
 
 TypeDef. TypeDef ::= "typedef" DataType Identifier ";" ;
 
@@ -45,9 +45,9 @@ Def. Dec ::= Identifier "=" Exp ;
 
 EThrow.		Exp1  ::= "throw" Exp1 ;
 ECond.      Exp2  ::= Exp2 "?" Exp3 ":" Exp3 ;
-EDAs.       Exp2  ::= Exp2 "-=" Exp2 ;
-EIAs.       Exp2  ::= Exp2 "+=" Exp2 ;
-EAss.       Exp2  ::= Exp2 "=" Exp2 ;
+EDAs.       Exp2  ::= Exp2 "-=" Exp3 ;
+EIAs.       Exp2  ::= Exp2 "+=" Exp3 ;
+EAss.       Exp2  ::= Exp2 "=" Exp3 ;
 EDis.		Exp3  ::= Exp3 "||" Exp4 ;
 ECon. 		Exp4  ::= Exp4 "&&" Exp5 ;
 ENeq.       Exp8  ::= Exp8 "!=" Exp9;
