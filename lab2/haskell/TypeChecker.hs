@@ -14,15 +14,38 @@ import CPP.ErrM
 
 
 typecheck :: Program -> Err ()
-typecheck PDef (DFun dataType id args stms) =
+typecheck (PDefs ((DFun dataType id args stms):ds)) = return ()
+typecheck (PDefs ((DFun dataType id args stms):[])) = return ()
 typecheck p = return ()
 
-checkStm :: Env -> Type -> Stm -> Err Env
-checkStm env t SExp exp = case checkExp env t exp of
-                            Ok    -> Ok t
-                            Bad s -> Bad s
-checkStm (sig, c) t1 SDecls t2 ids = Ok (update)
+checkStms :: Env -> Type -> [Stm] -> Err Env
+checkStms _ _ _ = fail "HEj"
 
+checkStm :: Env -> Type -> Stm -> Err Env
+checkStm env returnType x = case x of
+    SExp exp -> do
+        inferExp env exp
+        return env
+    SDecls typ (id:ids) -> do
+        newEnv <- updateVar env id typ
+        checkStm newEnv returnType (SDecls typ ids)
+    SDecls typ [] -> do
+        return env
+    SInit t id exp -> do
+        checkExp env t exp
+        updateVar env id t
+    SReturn exp -> do
+        check env returnType exp
+        return env
+    SWhile exp stm -> do
+        checkExp env Type_bool exp
+        checkStm env returnType stm
+    SBlock stms -> do
+        checkStms (newBlock env) returnType stms
+    SIfElse exp stm1 stm2 -> do
+        checkExp env Type_bool exp
+        checkStm env returnType stm1
+        checkStm env returnType stm2
 
 checkExp :: Env -> Type -> Exp -> Err ()
 checkExp env t exp = do
@@ -44,42 +67,42 @@ inferExp env (EPostIncr id) = lookupVar env id
 inferExp env (EPostDecr id) = lookupVar env id
 inferExp env (EPreIncr  id) = lookupVar env id
 inferExp env (EPreDecr  id) = lookupVar env id
-inferExp env (EApp id exps) = case lookupFun env  id of
-                                Ok (ts, t) -> f env ts exps t
-                                Bad s   -> Bad s
 inferExp env (ETimes e1 e2) = compareTypes env e1 e2
 inferExp env (EDiv   e1 e2) = compareTypes env e1 e2
 inferExp env (EPlus  e1 e2) = compareTypes env e1 e2
 inferExp env (EMinus e1 e2) = compareTypes env e1 e2
-inferExp env (ELt    e1 e2) = case compareTypes env e1 e2 of
-                          Ok _  -> Ok Type_bool
-                          Bad s -> Bad s
-inferExp env (EGt    e1 e2) = case compareTypes env e1 e2 of
-                          Ok _  -> Ok Type_bool
-                          Bad s -> Bad s
-inferExp env (ELtEq  e1 e2) = case compareTypes env e1 e2 of
-                          Ok _  -> Ok Type_bool
-                          Bad s -> Bad s
-inferExp env (EGtEq  e1 e2) = case compareTypes env e1 e2 of
-                          Ok _  -> Ok Type_bool
-                          Bad s -> Bad s
-inferExp env (EEq    e1 e2) = case compareTypes env e1 e2 of
-                          Ok _  -> Ok Type_bool
-                          Bad s -> Bad s
-inferExp env (ENEq   e1 e2) = case compareTypes env e1 e2 of
-                          Ok _  -> Ok Type_bool
-                          Bad s -> Bad s
-inferExp env (EAnd   e1 e2) = case compareTypes env e1 e2 of
-                          Ok _  -> Ok Type_bool
-                          Bad s -> Bad s
-inferExp env (EOr    e1 e2) = case compareTypes env e1 e2 of
-                          Ok _  -> Ok Type_bool
-                          Bad s -> Bad s
-inferExp env (EAss   id e1) = case lookupVar env id of
-                            Ok t1 -> case inferExp env e1 of
-                                    Ok t2 -> if t1 == t2 then Ok t1
-                                                         else Bad "Type error"
-                            Bad s -> Bad s
+inferExp env (EApp id exps) = case lookupFun env  id of
+                                Ok (ts, t) -> f env ts exps t
+                                Bad s   -> Bad s
+inferExp env (ELt    e1 e2) = do
+                          compareTypes env e1 e2
+                          return Type_bools
+inferExp env (EGt    e1 e2) = do
+                          compareTypes env e1 e2
+                          return Type_bools
+inferExp env (ELtEq  e1 e2) = do
+                          compareTypes env e1 e2
+                          return Type_bools
+inferExp env (EGtEq  e1 e2) = do
+                          compareTypes env e1 e2
+                          return Type_bools
+inferExp env (EEq    e1 e2) = do
+                          compareTypes env e1 e2
+                          return Type_bools
+inferExp env (ENEq   e1 e2) = do
+                          compareTypes env e1 e2
+                          return Type_bools
+inferExp env (EAnd   e1 e2) = do
+                          compareTypes env e1 e2
+                          return Type_bools
+inferExp env (EOr    e1 e2) = do
+                          compareTypes env e1 e2
+                          return Type_bools
+inferExp env (EAss   id e1) = do
+                            t1 <- lookupVar env id
+                            t2 <- inferExp env e1
+                            if t1 == t2 then return t1
+                                        else fail "Type error"
 
 
 lookupVar :: Env -> Id -> Err Type
@@ -110,12 +133,11 @@ emptyEnv  :: Env
 emptyEnv = (Map.empty, Map.empty:[])
 
 compareTypes :: Env -> Exp -> Exp -> Err Type
-compareTypes env e1 e2 = case inferExp env e1 of
-                         Ok t1 -> case inferExp env e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                 else Bad "Type error"
-                            Bad s -> Bad s
-                         Bad s -> Bad s
+compareTypes env e1 e2 = do
+                         t1 <- inferExp env e1
+                         t2 <- inferExp env e2
+                         if t1 == t2 then Ok t1
+                                     else Bad "Type error"
 
 f :: Env -> [Type] -> [Exp] -> Type -> Err Type
 f env []   []       t = Ok t
