@@ -17,134 +17,110 @@ typecheck :: Program -> Err ()
 typecheck PDef (DFun dataType id args stms) =
 typecheck p = return ()
 
-check :: Env -> Exp -> Err Type
-check env ETrue        = Ok Type_bool
-check env EFalse       = Ok Type_bool
-check env EInt       _ = Ok Type_int
-check env EDouble    _ = Ok Type_double
-check env EId       id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-check env EApp      id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-check env EPostIncr id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-check env EPostDecr id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-check env EPreIncr  id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-check env EPreDecr  id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-check env ETimes e1 e2 = case check env e1 of  -- Perhaps we need to infer type here instead since we could have 1 * 1.0
-                        Ok t1 -> case check env e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                    else Bad "Type t1 cannot be multiplied with type t2"
+checkStm :: Env -> Type -> Stm -> Err Env
+checkStm env t SExp exp = case checkExp env t exp of
+                            Ok    -> Ok t
                             Bad s -> Bad s
-                        Bad s -> Bad s
-check env EDiv   e1 e2 = case check env e1 of
-                        Ok t1 -> case check e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                    else Bad "Type t1 cannot be dived by type t2"
-                            Bad s -> Bad s
-                        Bad s -> Bad s
-check env EPlus  e1 e2 = case check env e1 of
-                        Ok t1 -> case check env e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                    else Bad "Type t1 connot be added to type t2"
-                            Bad s -> Bad s
-                        Bad s -> Bad s
-check env EMinus e1 e2 = case check env e1 of
-                        Ok t1 -> case check env e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                    else Bad "Type t1 cannot be subtracted from type t2"
-                            Bad s -> Bad s
-                        Bad s -> Bad s
-check env ELt    e1 e2 = infer env (ELt   e1 e2) -- should probably be some check here that e1 and e2 are comparable
-check env EGt    e1 e2 = infer env (EGt   e1 e2)
-check env ELtEq  e1 e2 = infer env (ELtEq e1 e2)
-check env EGtEq  e1 e2 = infer env (EGtEq e1 e2)
-check env EEq    e1 e2 = infer env (EEq   e1 e2)
-check env ENEq   e1 e2 = infer env (ENEq  e1 e2)
-check env EAnd   e1 e2 = infer env (EAnd  e1 e2)
-check env EOr    e1 e2 = infer (EOr   e1 e2)
-check env EAss   id e1 = case snd(lookup(id)) of -- Not sure, perhaps just return the type of the righthand expr but check that that is the expression of the left hand
-                        Ok e -> check env e
-                        Bad s -> raise error
+checkStm (sig, c) t1 SDecls t2 ids = Ok (update)
 
-infer :: Env -> Exp -> Maybe Type  -- Many of these might not be needed
-infer env ETrue        = Ok Type_bool
-infer env EFalse       = Ok Type_bool
-infer env EInt       _ = Ok Type_int
-infer env EDouble    _ = Ok Type_double
-infer env EId       id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-infer env EApp      id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-infer env EPostIncr id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-infer env EPostDecr id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-infer env EPreIncr  id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-infer env EPreDecr  id = case snd(lookup(id)) of
-                        Ok e -> check env e
-                        Bad s -> Bad s
-infer env ETimes e1 e2 = case check env e1 of  -- Perhaps we need to infer type here instead since we could have 1 * 1.0
-                        Ok t1 -> case check env e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                    else fail
+
+checkExp :: Env -> Type -> Exp -> Err ()
+checkExp env t exp = do
+    t2 <- inferExp env exp
+    if (t2 == t) then
+        return ()
+    else
+        fail $ "type of " ++ printTree exp ++
+               "expected" ++ printTree t   ++
+               "but found" ++ printTree t2
+
+inferExp :: Env -> Exp -> Err Type
+inferExp env ETrue        = Ok Type_bool
+inferExp env EFalse       = Ok Type_bool
+inferExp env (EInt       _) = Ok Type_int
+inferExp env (EDouble    _) = Ok Type_double
+inferExp env (EId       id) = lookupVar env id
+inferExp env (EPostIncr id) = lookupVar env id
+inferExp env (EPostDecr id) = lookupVar env id
+inferExp env (EPreIncr  id) = lookupVar env id
+inferExp env (EPreDecr  id) = lookupVar env id
+inferExp env (EApp id exps) = case lookupFun env  id of
+                                Ok (ts, t) -> f env ts exps t
+                                Bad s   -> Bad s
+inferExp env (ETimes e1 e2) = compareTypes env e1 e2
+inferExp env (EDiv   e1 e2) = compareTypes env e1 e2
+inferExp env (EPlus  e1 e2) = compareTypes env e1 e2
+inferExp env (EMinus e1 e2) = compareTypes env e1 e2
+inferExp env (ELt    e1 e2) = case compareTypes env e1 e2 of
+                          Ok _  -> Ok Type_bool
+                          Bad s -> Bad s
+inferExp env (EGt    e1 e2) = case compareTypes env e1 e2 of
+                          Ok _  -> Ok Type_bool
+                          Bad s -> Bad s
+inferExp env (ELtEq  e1 e2) = case compareTypes env e1 e2 of
+                          Ok _  -> Ok Type_bool
+                          Bad s -> Bad s
+inferExp env (EGtEq  e1 e2) = case compareTypes env e1 e2 of
+                          Ok _  -> Ok Type_bool
+                          Bad s -> Bad s
+inferExp env (EEq    e1 e2) = case compareTypes env e1 e2 of
+                          Ok _  -> Ok Type_bool
+                          Bad s -> Bad s
+inferExp env (ENEq   e1 e2) = case compareTypes env e1 e2 of
+                          Ok _  -> Ok Type_bool
+                          Bad s -> Bad s
+inferExp env (EAnd   e1 e2) = case compareTypes env e1 e2 of
+                          Ok _  -> Ok Type_bool
+                          Bad s -> Bad s
+inferExp env (EOr    e1 e2) = case compareTypes env e1 e2 of
+                          Ok _  -> Ok Type_bool
+                          Bad s -> Bad s
+inferExp env (EAss   id e1) = case lookupVar env id of
+                            Ok t1 -> case inferExp env e1 of
+                                    Ok t2 -> if t1 == t2 then Ok t1
+                                                         else Bad "Type error"
                             Bad s -> Bad s
-                        Bad s -> Bad s
-infer env EDiv   e1 e2 = case check env e1 of
-                        Ok t1 -> case check env e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                    else fail
-                            Bad s -> Bad s
-                        Bad s -> Bad s
-infer env EPlus  e1 e2 = case check env e1 of
-                        Ok t1 -> case check env e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                    else fail
-                            Bad s -> Bad s
-                        Bad s -> Bad s
-infer env EMinus e1 e2 = case check env e1 of
-                        Ok t1 -> case check env e2 of
-                            Ok t2 -> if t1 == t2 then Ok t1
-                                                    else fail
-                            Bad s -> Bad s
-                        Bad s -> Bad s
-infer env ELt    e1 e2 = infer env (ELt   e1 e2) -- should probably be some check here that e1 and e2 are comparable
-infer env EGt    e1 e2 = infer env (EGt   e1 e2)
-infer env ELtEq  e1 e2 = infer env (ELtEq e1 e2)
-infer env EGtEq  e1 e2 = infer env (EGtEq e1 e2)
-infer env EEq    e1 e2 = infer env (EEq   e1 e2)
-infer env ENEq   e1 e2 = infer env (ENEq  e1 e2)
-infer env EAnd   e1 e2 = infer env (EAnd  e1 e2)
-infer env EOr    e1 e2 = infer env (EOr   e1 e2)
-infer env EAss   id e1 = case snd(lookup(id)) of -- Not sure, perhaps just return the type of the righthand expr but check that that is the expression of the left hand
-                        Ok e -> check env e
-                        Bad s -> Bad s
+
 
 lookupVar :: Env -> Id -> Err Type
+lookupVar (_, [])   id = Bad ("Variable " ++ show id ++ " not found")
+lookupVar (sig, c:cs) id = case Map.lookup id c of
+                            Just t -> Ok t
+                            Nothing -> lookupVar (sig, cs) id
 
 lookupFun :: Env -> Id -> Err ([Type], Type)
+lookupFun (sig, _) id = case Map.lookup id sig of
+                            Just (ts, t) -> Ok (ts, t)
+                            Nothing -> Bad ("Variable " ++ show id ++ " not found")
 
 updateVar :: Env -> Id -> Type -> Err Env
+updateVar (sig, c:cs) id t = case Map.lookup id c of
+                                Just t2 -> Bad "Fuxk off"
+                                Nothing -> Ok $ (sig, (Map.insert id t c):cs)
 
 updateFun :: Env -> Id -> ([Type], Type) -> Err Env
-updateFun (Env sig) id (argTypes, reType) = Map.update sig
+updateFun (sig, c) id (ts, t) = case Map.lookup id sig of
+                                            Just (ts2, t2) -> Bad "Bugger off"
+                                            Nothing -> Ok $ (Map.insert id (ts, t) sig, c)
 
 newBlock  :: Env -> Env
+newBlock (sig, cs) = (sig, Map.empty:cs)
 
 emptyEnv  :: Env
-emptyEnv = Env (Sig Map.empty) (Contex Map.empty)
+emptyEnv = (Map.empty, Map.empty:[])
+
+compareTypes :: Env -> Exp -> Exp -> Err Type
+compareTypes env e1 e2 = case inferExp env e1 of
+                         Ok t1 -> case inferExp env e2 of
+                            Ok t2 -> if t1 == t2 then Ok t1
+                                                 else Bad "Type error"
+                            Bad s -> Bad s
+                         Bad s -> Bad s
+
+f :: Env -> [Type] -> [Exp] -> Type -> Err Type
+f env []   []       t = Ok t
+f env []   (y:ys)   t = Bad "Too few args@"
+f env (x:xs) []     t = Bad "Too few args"
+f env (x:xs) (y:ys) t = case checkExp env x y of
+                            Ok _ -> f env xs ys t
+                            Bad s -> Bad s
