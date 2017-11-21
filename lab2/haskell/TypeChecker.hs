@@ -14,12 +14,28 @@ import CPP.ErrM
 
 
 typecheck :: Program -> Err ()
-typecheck (PDefs ((DFun dataType id args stms):ds)) = return ()
-typecheck (PDefs ((DFun dataType id args stms):[])) = return ()
+typecheck (PDefs defs) = do
+        env <- addSignatures defs
+        checkDef env defs
 typecheck p = return ()
 
+addSignatures :: [Def] -> Err Env
+addSignatures []     = Ok newEnv
+addSignatures ((DFun returnType id args _):defs) = do
+    env <- addSignatures defs
+    updateFun env id ((map argToType args), returnType)
+
+checkDef :: Env -> [Def] -> Err ()
+checkDef env []                                    = do return ()
+checkDef env ((DFun returnType id args stms):defs) = do
+    checkStms (funcEnv env args) returnType stms
+    checkDef env defs
+
 checkStms :: Env -> Type -> [Stm] -> Err Env
-checkStms _ _ _ = fail "HEj"
+checkStms env returnType []         = Ok env
+checkStms env returnType (stm:stms) = do
+    newEnv <- checkStm env returnType stm
+    checkStms newEnv returnType stms
 
 checkStm :: Env -> Type -> Stm -> Err Env
 checkStm env returnType x = case x of
@@ -35,17 +51,20 @@ checkStm env returnType x = case x of
         checkExp env t exp
         updateVar env id t
     SReturn exp -> do
-        check env returnType exp
+        checkExp env returnType exp
         return env
     SWhile exp stm -> do
         checkExp env Type_bool exp
-        checkStm env returnType stm
+        (sig, _:con) <- checkStm (newBlock env) returnType stm
+        return (sig, con)
     SBlock stms -> do
-        checkStms (newBlock env) returnType stms
+        (sig, _:con) <- checkStms (newBlock env) returnType stms
+        return (sig, con)
     SIfElse exp stm1 stm2 -> do
         checkExp env Type_bool exp
-        checkStm env returnType stm1
-        checkStm env returnType stm2
+        (sig, _:con) <- checkStm (newBlock env) returnType stm1
+        (sig2, _:con2) <- checkStm (newBlock (sig, con)) returnType stm2
+        return (sig2, con2)
 
 checkExp :: Env -> Type -> Exp -> Err ()
 checkExp env t exp = do
@@ -76,28 +95,28 @@ inferExp env (EApp id exps) = case lookupFun env  id of
                                 Bad s   -> Bad s
 inferExp env (ELt    e1 e2) = do
                           compareTypes env e1 e2
-                          return Type_bools
+                          return Type_bool
 inferExp env (EGt    e1 e2) = do
                           compareTypes env e1 e2
-                          return Type_bools
+                          return Type_bool
 inferExp env (ELtEq  e1 e2) = do
                           compareTypes env e1 e2
-                          return Type_bools
+                          return Type_bool
 inferExp env (EGtEq  e1 e2) = do
                           compareTypes env e1 e2
-                          return Type_bools
+                          return Type_bool
 inferExp env (EEq    e1 e2) = do
                           compareTypes env e1 e2
-                          return Type_bools
+                          return Type_bool
 inferExp env (ENEq   e1 e2) = do
                           compareTypes env e1 e2
-                          return Type_bools
+                          return Type_bool
 inferExp env (EAnd   e1 e2) = do
                           compareTypes env e1 e2
-                          return Type_bools
+                          return Type_bool
 inferExp env (EOr    e1 e2) = do
                           compareTypes env e1 e2
-                          return Type_bools
+                          return Type_bool
 inferExp env (EAss   id e1) = do
                             t1 <- lookupVar env id
                             t2 <- inferExp env e1
@@ -132,6 +151,20 @@ newBlock (sig, cs) = (sig, Map.empty:cs)
 emptyEnv  :: Env
 emptyEnv = (Map.empty, Map.empty:[])
 
+newEnv :: Env
+newEnv = case emptyEnv of
+    (sig, cons) -> (
+                    (Map.insert (Id "readDouble") ([], Type_double)
+                    (Map.insert (Id "printDouble") ([Type_double], Type_void)
+                    (Map.insert (Id "readInt") ([], Type_int)
+                    (Map.insert (Id "printInt") ([Type_int], Type_void)
+                    sig))))
+                    , cons)
+
+funcEnv :: Env -> [Arg] -> Env
+funcEnv env [] = env
+funcEnv (sig, c:cons) ((ADecl t id):args)= funcEnv (sig, (Map.insert id t c):cons) args
+
 compareTypes :: Env -> Exp -> Exp -> Err Type
 compareTypes env e1 e2 = do
                          t1 <- inferExp env e1
@@ -146,3 +179,6 @@ f env (x:xs) []     t = Bad "Too few args"
 f env (x:xs) (y:ys) t = case checkExp env x y of
                             Ok _ -> f env xs ys t
                             Bad s -> Bad s
+
+argToType :: Arg -> Type
+argToType (ADecl typ id) = typ
