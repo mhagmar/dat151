@@ -14,22 +14,32 @@ import CPP.ErrM
 
 
 typecheck :: Program -> Err ()
+typecheck (PDefs []) = fail "Empty program"
 typecheck (PDefs defs) = do
         env <- addSignatures defs
         checkDef env defs
-typecheck p = return ()
+-- typecheck p = return ()
 
 addSignatures :: [Def] -> Err Env
 addSignatures []     = Ok newEnv
+addSignatures ((DFun returnType (Id "main") args _):defs) = case (returnType, args) of
+  (Type_int, []) -> do 
+                env <- addSignatures defs
+                updateFun env (Id "main") ((map argToType args), returnType)
+  otherwise -> fail "main() must have returntype int"
+
 addSignatures ((DFun returnType id args _):defs) = do
     env <- addSignatures defs
     updateFun env id ((map argToType args), returnType)
 
 checkDef :: Env -> [Def] -> Err ()
 checkDef env []                                    = do return ()
-checkDef env ((DFun returnType id args stms):defs) = do
-    checkStms (funcEnv env args) returnType stms
-    checkDef env defs
+checkDef env ((DFun returnType id args stms):defs) = case (funcEnv env args) of
+    Ok funEnv -> do 
+      checkStms funEnv returnType stms
+      checkDef funEnv defs
+    Bad s -> Bad s
+    
 
 checkStms :: Env -> Type -> [Stm] -> Err Env
 checkStms env returnType []         = Ok env
@@ -82,40 +92,56 @@ inferExp env EFalse       = Ok Type_bool
 inferExp env (EInt       _) = Ok Type_int
 inferExp env (EDouble    _) = Ok Type_double
 inferExp env (EId       id) = lookupVar env id
-inferExp env (EPostIncr id) = lookupVar env id
-inferExp env (EPostDecr id) = lookupVar env id
-inferExp env (EPreIncr  id) = lookupVar env id
-inferExp env (EPreDecr  id) = lookupVar env id
-inferExp env (ETimes e1 e2) = compareTypes env e1 e2
-inferExp env (EDiv   e1 e2) = compareTypes env e1 e2
-inferExp env (EPlus  e1 e2) = compareTypes env e1 e2
-inferExp env (EMinus e1 e2) = compareTypes env e1 e2
+inferExp env (EPostIncr id) = do
+                      t <- lookupVar env id
+                      if elem t [Type_int, Type_double] then
+                        return t
+                      else fail "has to be int or double to do postincr"
+inferExp env (EPostDecr id) = do
+                      t <- lookupVar env id
+                      if elem t [Type_int, Type_double] then
+                        return t
+                      else fail "has to be int or double to do postdecr"
+inferExp env (EPreIncr  id) = do
+                      t <- lookupVar env id
+                      if elem t [Type_int, Type_double] then
+                        return t
+                      else fail "has to be int or double to do preincr"
+inferExp env (EPreDecr  id) = do
+                      t <- lookupVar env id
+                      if elem t [Type_int, Type_double] then
+                        return t
+                      else fail "has to be int or double to do predecr"
+inferExp env (ETimes e1 e2) = compareTypes [Type_int, Type_double] env e1 e2
+inferExp env (EDiv   e1 e2) = compareTypes [Type_int, Type_double] env e1 e2
+inferExp env (EPlus  e1 e2) = compareTypes [Type_int, Type_double] env e1 e2
+inferExp env (EMinus e1 e2) = compareTypes [Type_int, Type_double] env e1 e2
 inferExp env (EApp id exps) = case lookupFun env  id of
                                 Ok (ts, t) -> f env ts exps t
                                 Bad s   -> Bad s
 inferExp env (ELt    e1 e2) = do
-                          compareTypes env e1 e2
+                          compareTypes [Type_int, Type_double] env e1 e2
                           return Type_bool
 inferExp env (EGt    e1 e2) = do
-                          compareTypes env e1 e2
+                          compareTypes [Type_int, Type_double] env e1 e2
                           return Type_bool
 inferExp env (ELtEq  e1 e2) = do
-                          compareTypes env e1 e2
+                          compareTypes [Type_int, Type_double] env e1 e2
                           return Type_bool
 inferExp env (EGtEq  e1 e2) = do
-                          compareTypes env e1 e2
+                          compareTypes [Type_int, Type_double] env e1 e2
                           return Type_bool
 inferExp env (EEq    e1 e2) = do
-                          compareTypes env e1 e2
+                          compareTypes [Type_int, Type_double, Type_bool] env e1 e2
                           return Type_bool
 inferExp env (ENEq   e1 e2) = do
-                          compareTypes env e1 e2
+                          compareTypes [Type_int, Type_double, Type_bool] env e1 e2
                           return Type_bool
 inferExp env (EAnd   e1 e2) = do
-                          compareTypes env e1 e2
+                          compareTypes [Type_bool] env e1 e2
                           return Type_bool
 inferExp env (EOr    e1 e2) = do
-                          compareTypes env e1 e2
+                          compareTypes [Type_bool] env e1 e2
                           return Type_bool
 inferExp env (EAss   id e1) = do
                             t1 <- lookupVar env id
@@ -136,6 +162,7 @@ lookupFun (sig, _) id = case Map.lookup id sig of
                             Nothing -> Bad ("Variable " ++ show id ++ " not found")
 
 updateVar :: Env -> Id -> Type -> Err Env
+updateVar (sig, []) id t = Ok $ (sig, (Map.insert id t Map.empty):[])
 updateVar (sig, c:cs) id t = case Map.lookup id c of
                                 Just t2 -> Bad "Fuxk off"
                                 Nothing -> Ok $ (sig, (Map.insert id t c):cs)
@@ -149,7 +176,7 @@ newBlock  :: Env -> Env
 newBlock (sig, cs) = (sig, Map.empty:cs)
 
 emptyEnv  :: Env
-emptyEnv = (Map.empty, Map.empty:[])
+emptyEnv = (Map.empty, [])
 
 newEnv :: Env
 newEnv = case emptyEnv of
@@ -161,16 +188,20 @@ newEnv = case emptyEnv of
                     sig))))
                     , cons)
 
-funcEnv :: Env -> [Arg] -> Env
-funcEnv env [] = env
-funcEnv (sig, c:cons) ((ADecl t id):args)= funcEnv (sig, (Map.insert id t c):cons) args
+funcEnv :: Env -> [Arg] -> Err Env
+funcEnv env [] = Ok env
+funcEnv (sig, []) ((ADecl t id):args) = funcEnv (sig, (Map.insert id t Map.empty):[]) args
+funcEnv (sig, c:cons) ((ADecl t id):args) = case Map.lookup id c of
+                            Just t -> fail "duplicate Variable name"
+                            _ -> funcEnv (sig, (Map.insert id t c):cons) args
 
-compareTypes :: Env -> Exp -> Exp -> Err Type
-compareTypes env e1 e2 = do
+compareTypes :: [Type] -> Env -> Exp -> Exp -> Err Type
+compareTypes types env e1 e2 = do
                          t1 <- inferExp env e1
-                         t2 <- inferExp env e2
-                         if t1 == t2 then Ok t1
-                                     else Bad "Type error"
+                         if elem t1 types then do 
+                            checkExp env t1 e2;
+                            return t1
+                         else Bad "Type error"
 
 f :: Env -> [Type] -> [Exp] -> Type -> Err Type
 f env []   []       t = Ok t
