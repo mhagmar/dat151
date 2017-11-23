@@ -11,7 +11,9 @@ import CPP.Abs
 import CPP.Print
 import CPP.ErrM
 
-
+type Env = (Sig, [Context])
+type Sig = Map Id ([Type], Type)
+type Context = Map Id Type
 
 typecheck :: Program -> Err ()
 typecheck (PDefs []) = fail "Empty program"
