@@ -25,7 +25,7 @@ interpret :: Program -> IO ()
 interpret (PDefs (defs)) = do 
 	env <- addFuns' emptyEnv defs
 	(DFun _ id args stms) <- lookupFun env (Id "main")
-	execStms env stms
+	evalFun (newBlock env) stms
 	return ()
 
 execStms :: Env -> [Stm] -> IO Env
@@ -80,6 +80,7 @@ execStm env stm = case stm of
 			env2 <- execStm (newBlock env1) stm2
 			return (exitBlock env2)
 
+
 addDecls :: Env -> [Id] -> IO Env
 addDecls env [] = return env
 addDecls env (id:ids) = do
@@ -114,11 +115,11 @@ evalExp env exp = case exp of
 	EApp id exps -> case id of 
 		(Id "printInt") -> do 
 			(val, env1) <- evalExp env exp 
-			print val
+			putStrLn $ show val
 			return (Void, env1)
 		(Id "printDouble") -> do
 			(val, env1) <- evalExp env exp 
-			print val
+			putStrLn $ show val
 			return (Void, env1)
 		(Id "readInt") -> do 
 			string <- getLine
@@ -275,9 +276,7 @@ lookupVar :: Env -> Id -> IO Val
 lookupVar (sig, []) id = fail ((show id) ++ " not declared")
 lookupVar (sig, c:con) id = case Map.lookup id c of
 	Just val -> return val
-	Nothing -> do 
-		val <- lookupVar (sig, con) id
-		return val
+	Nothing -> lookupVar (sig, con) id
 
 lookupFun :: Env -> Id -> IO Def
 lookupFun (sig, con) id = case Map.lookup id sig of
