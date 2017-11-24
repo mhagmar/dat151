@@ -254,7 +254,7 @@ mapArgsToVals :: Env -> [Arg] -> [Exp] -> IO Env
 mapArgsToVals env [] [] = return env
 mapArgsToVals env ((ADecl t id):args) (exp:exps) = do
 				(val, env1) <- evalExp env exp
-				updatedEnv <- extendVar env1 id val
+				updatedEnv <- addVar env1 id val
 				mapArgsToVals updatedEnv args exps
 							
 
@@ -299,6 +299,7 @@ addFun (sig, con) (DFun t id args stms) = case Map.lookup id sig of
 	Nothing -> return ((Map.insert id (DFun t id args stms) sig), con)
 
 addVar :: Env -> Id -> Val -> IO Env
+addVar (sig, []) id val = fail "fail addvar"
 addVar (sig, c:con) id val = case Map.lookup id c of
 	Just _ -> fail ("Variable " ++ (show id) ++ " is already declared.")
 	Nothing -> return (sig, (Map.insert id val c):con)

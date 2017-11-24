@@ -2,8 +2,6 @@ module TypeChecker where
 
 import Control.Monad
 
-import Env
-
 import Data.Map (Map)
 import qualified Data.Map as Map
 
