@@ -17,15 +17,22 @@ data Val
 	= I Integer 
 	| D Double 
 	| B Bool 
-	| Void 
-	deriving (Eq, Show, Ord, Read)
+	| Void
+	| Ret Val
+	deriving (Eq, Ord, Read)
+
+instance Show Val where
+   show (I i) = show i
+   show (D d) = show d
+   show (B b) = show b
+   show Void  = show ""
 
 
 interpret :: Program -> IO ()
 interpret (PDefs (defs)) = do 
 	env <- addFuns' emptyEnv defs
 	(DFun _ id args stms) <- lookupFun env (Id "main")
-	evalFun (newBlock env) stms
+	execBlock (newBlock env) stms
 	return ()
 
 execStms :: Env -> [Stm] -> IO Env
@@ -60,25 +67,33 @@ execStm env stm = case stm of
 		(val, env1) <- evalExp env exp
 		addVar env1 id val
 	SReturn exp -> do
-		(_, env1) <- evalExp env exp
-		return env1
+		(val, env1) <- evalExp env exp
+		newEnv <- addVar env1 (Id "return") val
+		return newEnv
 	SWhile exp stm -> do
 		(B bool, env1) <- evalExp env exp
 		if bool then do
-			env2 <- execStm (newBlock env1) stm
-			execStm (exitBlock env2) (SWhile exp stm)
+			(sig, c:con) <- execStm (newBlock env1) stm
+			case Map.lookup (Id "return") c of
+			    (Just val) -> propagateReturn (sig, c:con)
+			    Nothing -> execStm (sig, con) (SWhile exp stm)
 		else return env1
 	SBlock stms -> do
 		env2 <- execBlock (newBlock env) stms
-		return (exitBlock env2)
+		propagateReturn env2
 	SIfElse exp stm1 stm2 -> do
 		(B bool, env1) <- evalExp env exp
 		if bool then do
 			env2 <- execStm (newBlock env1) stm1
-			return (exitBlock env2)
+			propagateReturn env2
 		else do 
 			env2 <- execStm (newBlock env1) stm2
-			return (exitBlock env2)
+			propagateReturn env2
+
+propagateReturn :: Env -> IO Env
+propagateReturn (sig, c:con) = case Map.lookup (Id "return") c of
+    (Just val) -> addVar (sig, con) (Id "return") val
+    Nothing -> return (sig, con)
 
 
 addDecls :: Env -> [Id] -> IO Env
@@ -88,20 +103,12 @@ addDecls env (id:ids) = do
 	addDecls env1 ids
 
 execBlock :: Env -> [Stm] -> IO Env
-execBlock env [] 	   = return env
+execBlock (sig, c:con) [] = return (sig, c:con)
 execBlock env (stm:stms) = do
-	env1 <- execStm env stm
-	execBlock env1 stms
-
-evalFun :: Env -> [Stm] -> IO (Val, Env)
-evalFun (sig, c:con) [] = return (Void, (sig, con))
-evalFun env (stm:stms) = case stm of 
-	SReturn exp -> do
-		(val, env1) <- evalExp env exp
-		return (val, (exitBlock env1))
-	otherwise -> do
-		newEnv <- execStm env stm
-		evalFun newEnv stms
+        (sig, c:con)<- execStm env stm
+        case Map.lookup (Id "return") c of
+            (Just val) -> return (sig, c:con)
+            Nothing    -> execBlock (sig, c:con) stms
 
 evalExp :: Env -> Exp -> IO (Val, Env)
 evalExp env exp = case exp of
@@ -112,25 +119,7 @@ evalExp env exp = case exp of
 	EId id -> do 
 		val <- lookupVar env id
 		return (val, env)
-	EApp id exps -> case id of 
-		(Id "printInt") -> do 
-			(val, env1) <- evalExp env exp 
-			putStrLn $ show val
-			return (Void, env1)
-		(Id "printDouble") -> do
-			(val, env1) <- evalExp env exp 
-			putStrLn $ show val
-			return (Void, env1)
-		(Id "readInt") -> do 
-			string <- getLine
-			return ((I (read string)), env)
-		(Id "readDouble") -> do 
-			string <- getLine
-			return ((D (read string)), env)
-		otherwise -> do
-			(DFun t id2 args stms) <- lookupFun env id
-			env1 <- mapArgsToVals (newBlock env) args exps
-			evalFun env1 stms
+	EApp id exps -> applyFunc env id exps
 	EPostIncr id -> do
 		val <- lookupVar env id
 		case val of
@@ -238,16 +227,51 @@ evalExp env exp = case exp of
 		return (B ((/=) val1 val2), newEnv2)
 	EAnd exp1 exp2 -> do
 		(B val1, newEnv1) <- evalExp env exp1
-		(B val2, newEnv2) <- evalExp newEnv1 exp2
-		return (B ((&&) val1 val2), newEnv2)
+		if not val1 then return (B False, newEnv1)
+		else do
+		    (B val2, newEnv2) <- evalExp newEnv1 exp2
+		    return (B val2, newEnv2)
 	EOr exp1 exp2 -> do
 		(B val1, newEnv1) <- evalExp env exp1
-		(B val2, newEnv2) <- evalExp newEnv1 exp2
-		return (B ((||) val1 val2), newEnv2)
+		if val1 then return (B True, newEnv1)
+		else do
+		    (B val2, newEnv2) <- evalExp newEnv1 exp2
+		    return (B val2, newEnv2)
 	EAss id exp -> do
 		(val, env1) <- evalExp env exp
 		env2 <- extendVar env1 id val
 		return (val, env2)
+
+applyFunc :: Env -> Id -> [Exp] -> IO (Val, Env)
+applyFunc env (Id "printInt") exps = case exps of
+		    (exp1:[]) -> do
+		        (val, env1) <- evalExp env exp1
+		        putStrLn $ show val
+		        return (Void, env1)
+		    otherwise -> fail "to many arguments for print function"
+applyFunc env (Id "printDouble") exps = case exps of
+           (exp1:[]) -> do
+                (val, env1) <- evalExp env exp1
+                putStrLn $ show val
+                return (Void, env1)
+           otherwise -> fail "to many arguments for print function"
+applyFunc env (Id "readInt") exps = case exps of
+		    [] -> do
+		        string <- getLine
+		        return ((I (read string)), env)
+		    otherwise -> fail "to many arguments for print function"
+applyFunc env (Id "readDouble") exps = case exps of
+		    [] -> do
+		        string <- getLine
+		        return ((D (read string)), env)
+		    otherwise -> fail "to many arguments for print function"
+applyFunc env id exps = do
+			(DFun t id2 args stms) <- lookupFun env id
+			env1 <- mapArgsToVals (newBlock env) args exps
+			(sig, c:con) <- execBlock env1 stms
+			case Map.lookup (Id "return") c of
+			    (Just val) -> return (val, (sig, con))
+			    Nothing -> return (Void, (sig, con))
 
 -- assumes that [Arg] and [Exp] have the same length, 
 -- typechecker should catch it otherwise.
