@@ -34,10 +34,10 @@ addSignatures ((DFun returnType id args _):defs) = do
 
 checkDef :: Env -> [Def] -> Err ()
 checkDef env []                                    = do return ()
-checkDef env ((DFun returnType id args stms):defs) = case (funcEnv env args) of
-    Ok funEnv -> do 
-      checkStms funEnv returnType stms
-      checkDef funEnv defs
+checkDef env ((DFun returnType id args stms):defs) = case (funcEnv (newBlock env) args) of
+    Ok (sig, c:con) -> do 
+      checkStms (sig, c:con) returnType stms
+      checkDef (sig, con) defs
     Bad s -> Bad s
     
 
@@ -192,7 +192,7 @@ funcEnv :: Env -> [Arg] -> Err Env
 funcEnv env [] = Ok env
 funcEnv (sig, []) ((ADecl t id):args) = funcEnv (sig, (Map.insert id t Map.empty):[]) args
 funcEnv (sig, c:cons) ((ADecl t id):args) = case Map.lookup id c of
-                            Just t -> fail "duplicate Variable name"
+                            Just t -> fail ("duplicate Variable name" ++ show id)
                             _ -> funcEnv (sig, (Map.insert id t c):cons) args
 
 compareTypes :: [Type] -> Env -> Exp -> Exp -> Err Type
