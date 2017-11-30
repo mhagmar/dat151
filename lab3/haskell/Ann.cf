@@ -1,0 +1,63 @@
+-- Type-annotated syntax
+
+PDefs.   Program ::= [Def] ;
+
+DFun.    Def    ::= Type Id "(" [Arg] ")" "{" [Stm] "}" ;
+
+terminator Def "" ;
+
+ADecl.   Arg    ::= Type Id ;
+
+separator Arg "," ;
+
+SExp.    Stm    ::= "(" Type ")" Exp ";" ;
+SDecls.  Stm    ::= Type [Id] ";" ;
+SInit.   Stm    ::= Type Id "=" Exp ";" ;
+SReturn. Stm    ::= "return" "(" Type ")" Exp ";" ;
+SWhile.  Stm    ::= "while" "(" Exp ")" Stm ;
+SBlock.  Stm    ::= "{" [Stm] "}" ;
+SIfElse. Stm    ::= "if" "(" Exp ")" Stm "else" Stm ;
+
+terminator Stm "" ;
+
+ETrue.   Exp13  ::= "true" ;
+EFalse.  Exp13  ::= "false" ;
+EInt.    Exp13  ::= Integer ;
+EDouble. Exp13  ::= Double ;
+EId.     Exp13  ::= Id ;
+
+EApp.    Exp13  ::= Id "(" [Exp] ")" ;
+
+EPostIncr.  Exp13  ::= Id "++" ;
+EPostDecr.  Exp13  ::= Id "--" ;
+
+EPreIncr.   Exp13  ::= "++" Id ;
+EPreDecr.   Exp13  ::= "--" Id ;
+
+ETimes.  Exp12  ::= "(" Type ")" "(" Exp12 "*"  Exp13 ")" ;
+EDiv.    Exp12  ::= "(" Type ")" "(" Exp12 "/"  Exp13 ")" ;
+EPlus.   Exp11  ::= "(" Type ")" "(" Exp11 "+"  Exp12 ")" ;
+EMinus.  Exp11  ::= "(" Type ")" "(" Exp11 "-"  Exp12 ")" ;
+ELt.     Exp9   ::= "(" Type ")" "(" Exp10 "<"  Exp10 ")" ;
+EGt.     Exp9   ::= "(" Type ")" "(" Exp10 ">"  Exp10 ")" ;
+ELtEq.   Exp9   ::= "(" Type ")" "(" Exp10 "<=" Exp10 ")" ;
+EGtEq.   Exp9   ::= "(" Type ")" "(" Exp10 ">=" Exp10 ")" ;
+EEq.     Exp8   ::= "(" Type ")" "(" Exp9  "==" Exp9  ")" ;
+ENEq.    Exp8   ::= "(" Type ")" "(" Exp9  "!=" Exp9  ")" ;
+EAnd.    Exp4   ::= Exp4  "&&" Exp5 ;
+EOr.     Exp3   ::= Exp3  "||" Exp4 ;
+EAss.    Exp2   ::= Exp3  "="  Exp2 ;
+
+coercions Exp 13 ;
+
+separator Exp "," ;
+
+rules Type   ::= "bool" | "int" | "double" | "void" ;
+
+token Id (letter (letter | digit | '_')*) ;
+
+separator nonempty Id "," ;
+
+comment "#" ;
+comment "//" ;
+comment "/*" "*/" ;
