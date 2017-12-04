@@ -6,7 +6,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 import CPP.Abs as C
-import Ann.Print
+import Ann.Print as An
+import CPP.Print as CP
 import CPP.ErrM
 import Ann.Abs as A
 
@@ -19,32 +20,10 @@ typecheck :: C.Program -> Err A.Program
 typecheck (C.PDefs []) = fail "Empty program"
 typecheck (C.PDefs defs) = do
         env <- addSignatures defs
-        checkDef env defs
-        return convertProg defs
+        adefs <- checkDef env defs
+        return (A.PDefs adefs)
+        -- return convertProg defs
         -- if checkDef returns alright, convert CPP.Program to Ann.Program?
-
-convertProg :: [C.Def] -> [A.Def]
-convertProg [] = []
-convertProg (c:cs) = (convertDef c):(convertProg cs)
-
-convertDef :: C.Def -> A.Def
-convertDef (C.DFun t id args stms) = (A.DFun (convertType t) (convertId id) (map convertArg args) (map convertStm stms))
-
-convertStms :: C.Stm -> A.Stm
-
-convertArg :: C.Arg -> A.Arg
-convertArg (C.ADecl t id) = (A.ADecl (convertType t) (convertId id))
-
-convertId :: C.Id -> A.Id
-convertId (C.Id s) = (A.Id s)
-
-convertType :: C.Type -> A.Type
-convertType typ = case typ of
-  C.Type_bool -> C.Type_bool
-  C.Type_double -> C.Type_double
-  C.Type_int -> C.Type_int
-  C.Type_void -> C.Type_void
-
 
 addSignatures :: [C.Def] -> Err Env
 addSignatures []     = Ok newEnv
@@ -57,20 +36,24 @@ addSignatures ((C.DFun returnType id args _):defs) = do
     env <- addSignatures defs
     updateFun env id ((map argToType args), returnType)
 
-checkDef :: Env -> [C.Def] -> Err ()
-checkDef env []                                    = do return ()
+checkDef :: Env -> [C.Def] -> Err [A.Def]
+checkDef env []                                    = do return []
 checkDef env ((C.DFun returnType id args stms):defs) = case (funcEnv (newBlock env) args) of
     Ok (sig, c:con) -> do 
-      checkStms (sig, c:con) (convertType returnType) stms
-      checkDef (sig, con) defs
+      ((sig1, c1:con1), astmas) <- checkStms (sig, c:con) returnType stms []
+      adefs <- checkDef (sig1, con1) defs
+      createADefList (A.DFun (convertType returnType) (convertId id) (map convertArg args) astmas) adefs
     Bad s -> Bad s
-    
 
-checkStms :: Env -> C.Type -> [C.Stm] -> Err (Env, [A.Stm])
-checkStms env returnType []         = Ok env
-checkStms env returnType (stm:stms) = do
-    newEnv <- checkStm env returnType stm
-    checkStms newEnv returnType stms
+createADefList :: A.Def -> [A.Def] -> Err [A.Def]
+createADefList adef adefs = Ok (adef:adefs)
+
+checkStms :: Env -> C.Type -> [C.Stm] -> [A.Stm] -> Err (Env, [A.Stm])
+checkStms env returnType [] astms   = Ok (env, astms)
+checkStms env returnType (stm:stms) (astmas) = do
+    (newEnv, astma) <- checkStm env returnType stm
+    checkStms newEnv returnType stms (astmas ++ [astma])
+
 
 checkStm :: Env -> C.Type -> C.Stm -> Err (Env, A.Stm)
 checkStm env returnType x = case x of
@@ -88,14 +71,14 @@ checkStm env returnType x = case x of
         newEnv <- updateVar env id t
         return (newEnv, (A.SInit (convertType t) (convertId id) aexp))
     C.SReturn exp -> do
-        aexp <- checkExp env returnType exp
-        return (env, (A.SReturn aexp))
+        aexp <- checkExp env (convertType returnType) exp
+        return (env, (A.SReturn (convertType returnType) aexp))
     C.SWhile exp stm -> do
         aexp <- checkExp env A.Type_bool exp
         ((sig, _:con), astma) <- checkStm (newBlock env) returnType stm
         return ((sig, con), (A.SWhile aexp astma))
     C.SBlock stms -> do
-        ((sig, _:con), astmas) <- checkStms (newBlock env) returnType stms
+        ((sig, _:con), astmas) <- checkStms (newBlock env) returnType stms []
         return ((sig, con), (A.SBlock astmas))
     C.SIfElse exp stm1 stm2 -> do
         aexp <- checkExp env A.Type_bool exp
@@ -109,9 +92,9 @@ checkExp env t exp = do
     if (atyp == t) then
         return aexp
     else
-        fail $ "type of " ++ printTree exp ++
-               "expected" ++ printTree t   ++
-               "but found" ++ printTree t2
+        fail $ "type of " ++ CP.printTree exp ++
+               "expected" ++ An.printTree t   ++
+               "but found" ++ An.printTree atyp
 
 inferExp :: Env -> C.Exp -> Err (A.Type, A.Exp)
 inferExp env C.ETrue        = Ok (A.Type_bool, (A.ETrue))
@@ -119,61 +102,63 @@ inferExp env C.EFalse       = Ok (A.Type_bool, (A.EFalse))
 inferExp env (C.EInt     i) = Ok (A.Type_int, (A.EInt i))
 inferExp env (C.EDouble  d) = Ok (A.Type_double, (A.EDouble d))
 inferExp env (C.EId     id) = do 
-                        ctyp <- lookupVar env id
-                        return ((convertType ctyp), A.Eid id)
+                        atyp <- lookupVar env id
+                        return (atyp, A.EId (convertId id))
 inferExp env (C.EPostIncr id) = do
-                        ctyp <- lookupVar env id
-                        if elem ctyp [C.Type_int, C.Type_double] then
-                          return ((convertType ctyp), A.EPostIncr id)
+                        atyp <- lookupVar env id
+                        if elem atyp [A.Type_int, A.Type_double] then
+                          return (atyp, A.EPostIncr (convertId id))
                         else fail "has to be int or double to do postincr"
 inferExp env (C.EPostDecr id) = do
-                        ctyp <- lookupVar env id
-                        if elem ctyp [C.Type_int, C.Type_double] then
-                          return ((convertType ctyp), A.EPostDecr id)
+                        atyp <- lookupVar env id
+                        if elem atyp [A.Type_int, A.Type_double] then
+                          return (atyp, A.EPostDecr (convertId id))
                         else fail "has to be int or double to do postdecr"
 inferExp env (C.EPreIncr  id) = do
-                        ctyp <- lookupVar env id
-                        if elem ctyp [C.Type_int, C.Type_double] then
-                          return ((convertType ctyp), A.EPreIncr id)
+                        atyp <- lookupVar env id
+                        if elem atyp [A.Type_int, A.Type_double] then
+                          return (atyp, A.EPreIncr (convertId id))
                         else fail "has to be int or double to do preincr"
 inferExp env (C.EPreDecr  id) = do
-                        ctyp <- lookupVar env id
-                        if elem ctyp [C.Type_int, C.Type_double] then
-                          return ((convertType ctyp), A.EPreDecr id)
+                        atyp <- lookupVar env id
+                        if elem atyp [A.Type_int, A.Type_double] then
+                          return (atyp, A.EPreDecr (convertId id))
                         else fail "has to be int or double to do predecr"
 inferExp env (C.ETimes e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double] env e1 e2
-                        return (atyp, (A.ETimes aexp a2exp))
+                        return (atyp, (A.ETimes atyp aexp a2exp))
 inferExp env (C.EDiv   e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double] env e1 e2
-                        return (atyp, (A.EDiv aexp a2exp))
+                        return (atyp, (A.EDiv atyp aexp a2exp))
 inferExp env (C.EPlus  e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double] env e1 e2
-                        return (atyp, (A.EPlus aexp a2exp))
+                        return (atyp, (A.EPlus atyp aexp a2exp))
 inferExp env (C.EMinus e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double] env e1 e2
-                        return (atyp, (A.EMinus aexp a2exp))
+                        return (atyp, (A.EMinus atyp aexp a2exp))
 inferExp env (C.EApp id exps) = case lookupFun env  id of
-                        Ok (ts, t) -> return ((convertType t), A.EApp (convertId id) (f env ts exps t))
+                        Ok (ts, t) -> do 
+                            aexps <- (f env ts exps t)
+                            return ((convertType t), (A.EApp (convertId id) aexps))
                         Bad s   -> Bad s
 inferExp env (C.ELt    e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double] env e1 e2
-                        return (A.Type_bool, (A.ELt aexp a2exp))
+                        return (A.Type_bool, (A.ELt atyp aexp a2exp))
 inferExp env (C.EGt    e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double] env e1 e2
-                        return (A.Type_bool, (A.EGt aexp a2exp))
+                        return (A.Type_bool, (A.EGt atyp aexp a2exp))
 inferExp env (C.ELtEq  e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double] env e1 e2
-                        return (A.Type_bool, (A.ELtEq aexp a2exp))
+                        return (A.Type_bool, (A.ELtEq atyp aexp a2exp))
 inferExp env (C.EGtEq  e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double] env e1 e2
-                        return (A.Type_bool, (A.EGtEq aexp a2exp))
+                        return (A.Type_bool, (A.EGtEq atyp aexp a2exp))
 inferExp env (C.EEq    e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double, A.Type_bool] env e1 e2
-                        return (A.Type_bool, (A.EEq aexp a2exp))
+                        return (A.Type_bool, (A.EEq atyp aexp a2exp))
 inferExp env (C.ENEq   e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_int, A.Type_double, A.Type_bool] env e1 e2
-                        return (A.Type_bool, (A.ENeq aexp a2exp))
+                        return (A.Type_bool, (A.ENEq atyp aexp a2exp))
 inferExp env (C.EAnd   e1 e2) = do
                         (atyp, aexp, a2exp) <- compareTypes [A.Type_bool] env e1 e2
                         return (A.Type_bool, (A.EAnd aexp a2exp))
@@ -183,7 +168,7 @@ inferExp env (C.EOr    e1 e2) = do
 inferExp env (C.EAss   id e1) = do
                             t1 <- lookupVar env id
                             (atyp, aexp) <- inferExp env e1
-                            if t1 == atyp then return (atyp, (A.EAss (convertId id) aexp))
+                            if t1 == atyp then return (atyp, (A.EAss (A.EId (convertId id)) aexp))
                                         else fail "Type error"
 
 
@@ -245,8 +230,31 @@ f env []   []       t = Ok []
 f env []   (y:ys)   t = Bad "Too few args@"
 f env (x:xs) []     t = Bad "Too few args"
 f env (x:xs) (y:ys) t = do 
-                        (_, aexp)<- checkExp env x y
-                        return (aexp:(f env xs ys t))
+                        aexp <- checkExp env (convertType x) y
+                        aexps <- (f env xs ys t)
+                        return (aexp:aexps)
 
 argToType :: C.Arg -> C.Type
 argToType (C.ADecl typ id) = typ
+
+-- convertProg :: [C.Def] -> [A.Def]
+-- convertProg [] = []
+-- convertProg (c:cs) = (convertDef c):(convertProg cs)
+
+-- convertDef :: C.Def -> A.Def
+-- convertDef (C.DFun t id args stms) = (A.DFun (convertType t) (convertId id) (map convertArg args) (map convertStm stms))
+
+convertArg :: C.Arg -> A.Arg
+convertArg (C.ADecl t id) = (A.ADecl (convertType t) (convertId id))
+
+convertId :: C.Id -> A.Id
+convertId (C.Id s) = (A.Id s)
+
+convertType :: C.Type -> A.Type
+convertType typ = case typ of
+  C.Type_bool -> A.Type_bool
+  C.Type_double -> A.Type_double
+  C.Type_int -> A.Type_int
+  C.Type_void -> A.Type_void
+
+
