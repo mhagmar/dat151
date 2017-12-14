@@ -32,7 +32,7 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [file] -> check (dropExtension $ takeFileName file) =<< readFile file
+    [file] -> check (dropExtension file) =<< readFile file
     _      -> do
       putStrLn "Usage: lab3 <SourceFile>"
       exitFailure

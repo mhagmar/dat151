@@ -2,19 +2,19 @@
 
 .PHONY : lab3 test testsuite
 
-testcore=test
+# testcore=test
 
-default : test
+# default : test
 
 # cannot be default goal, will loop forever
-all : test testsuite
+# all : test testsuite
 
-test : test/$(testcore).cc lab3 Runtime.class
-	lab3 $<
-	java $(testcore)
+# test : test/$(testcore).cc lab3 Runtime.class
+#	./lab3 $<
+#	java $(testcore)
 
-testsuite : lab3 Runtime.class
-	./run-testsuite.sh
+#testsuite : lab3 Runtime.class
+#	./run-testsuite.sh
 
 lab3 : lab3.hs TypeChecker.hs Compiler.hs CPP/Test Ann/Abs.hs
 	ghc --make lab3.hs -o lab3

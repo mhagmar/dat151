@@ -1,5 +1,7 @@
 *.j
 *.class
+lab3
+lab3-testsuite/*
 
 # Created by https://www.gitignore.io/api/emacs,haskell
 

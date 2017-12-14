@@ -79,6 +79,7 @@ data Code
   | Pop Type         -- ^ Drop top stack element of type @Type@.
   | Return Type      -- ^ Return from method of type @Type@.
   | Call Fun         -- ^ Call function.
+  | Dup
 
   -- | Inc Type Addr Int -- ^ In/decrease variable by small number
   | Add Type         -- ^ Add 2 top values of stack.
@@ -88,6 +89,9 @@ data Code
 
   | IfEq Label
   | IfLt Label
+  | IfCmpEq Label
+  | IfCmpLt Label
+  | IfCmpLe Label
   | IfLte Label
   | IfGt Label
   | IfGte Label
@@ -154,8 +158,7 @@ compileFun def@(DFun t f args ss) = do
 
   -- prepare environment
   lab <- gets nextLabel
-  c   <- gets cxt
-  put initSt{ cxt = ((Map.empty):c),nextLabel = lab}
+  put initSt{nextLabel = lab}
   mapM_ (\ (ADecl t' x) -> newVar x t') args
 
   -- compile statements
@@ -232,7 +235,8 @@ compileStm s = do
 
 compileExp :: Exp -> Compile ()
 compileExp = \case
-
+    ETrue  -> emit (IConst 1)
+    EFalse -> emit (IConst 0)
     EInt i -> do
       emit (IConst i)
 
@@ -259,7 +263,7 @@ compileExp = \case
     EPostIncr x -> do
       (a, t) <- lookupVar x
       emit (Load t a)
-      emit (Load t a)
+      emit Dup
       emit (IConst 1)
       emit (Add t)
       emit (Store t a)
@@ -267,7 +271,7 @@ compileExp = \case
     EPostDecr x -> do
       (a, t) <- lookupVar x
       emit (Load t a)
-      emit (Load t a)
+      emit Dup
       emit (IConst 1)
       emit (Sub t)
       emit (Store t a)
@@ -303,8 +307,7 @@ compileExp = \case
         end  <- getLabel
         compileExp exp1
         compileExp exp2
-        emit (Sub t)
-        emit (IfLt true)
+        emit (IfCmpLt true)
         emit (IConst 0)
         emit (GoTo end)
         emit (Lab true)
@@ -315,10 +318,9 @@ compileExp = \case
     EGt t exp1 exp2 -> do
         true <- getLabel
         end  <- getLabel
-        compileExp exp1
         compileExp exp2
-        emit (Sub t)
-        emit (IfGt true)
+        compileExp exp1
+        emit (IfCmpLt true)
         emit (IConst 0)
         emit (GoTo end)
         emit (Lab true)
@@ -330,8 +332,7 @@ compileExp = \case
         end  <- getLabel
         compileExp exp1
         compileExp exp2
-        emit (Sub t)
-        emit (IfLte true)
+        emit (IfCmpLe true)
         emit (IConst 0)
         emit (GoTo end)
         emit (Lab true)
@@ -341,10 +342,9 @@ compileExp = \case
     EGtEq t exp1 exp2 -> do
         true <- getLabel
         end  <- getLabel
-        compileExp exp1
         compileExp exp2
-        emit (Sub t)
-        emit (IfGte true)
+        compileExp exp1
+        emit (IfCmpLe true)
         emit (IConst 0)
         emit (GoTo end)
         emit (Lab true)
@@ -354,10 +354,9 @@ compileExp = \case
     EEq t exp1 exp2 -> do
         true <- getLabel
         end  <- getLabel
-        compileExp exp2
         compileExp exp1
-        emit (Sub t)
-        emit (IfEq true)
+        compileExp exp2
+        emit (IfCmpEq true)
         emit (IConst 0)
         emit (GoTo end)
         emit (Lab true)
@@ -367,10 +366,9 @@ compileExp = \case
     ENEq t exp1 exp2 -> do
         true <- getLabel
         end  <- getLabel
-        compileExp exp2
         compileExp exp1
-        emit (Sub t)
-        emit (IfEq true)
+        compileExp exp2
+        emit (IfCmpEq true)
         emit (IConst 1)
         emit (GoTo end)
         emit (Lab true)
@@ -379,36 +377,29 @@ compileExp = \case
 
     EAnd exp1 exp2 -> do
         compileExp exp1
-        compileExp exp2
-        emit (Add Type_int)
-        emit (IConst 2)
-        true <- getLabel
+        false <- getLabel
         end  <- getLabel
-        emit (Sub Type_int)
-        emit (IfEq true)
-        emit (IConst 0)
+        emit (IfEq false)
+        compileExp exp2
         emit (GoTo end)
-        emit (Lab true)
-        emit (IConst 1)
+        emit (Lab false)
+        emit (IConst 0)
         emit (Lab end)
 
     EOr exp1 exp2 -> do
         compileExp exp1
-        compileExp exp2
-        emit (Add Type_int)
-        emit (IConst 1)
-        true <- getLabel
+        false <- getLabel
         end  <- getLabel
-        emit (Sub Type_int)
-        emit (IfLte true)
-        emit (IConst 0)
-        emit (GoTo end)
-        emit (Lab true)
+        emit (IfEq false)
         emit (IConst 1)
+        emit (GoTo end)
+        emit (Lab false)
+        compileExp exp2
         emit (Lab end)
 
     EAss (EId id) exp2 -> do
         compileExp exp2
+        emit Dup
         (a, t) <- lookupVar id
         emit (Store t a)
 
@@ -441,6 +432,7 @@ emit c = do
     Sub t     -> decStack t
     Mul t     -> decStack t
     Div t     -> decStack t
+    Dup       -> incStack Type_int
     s         -> return ()
 
 instance ToJVM Code where
@@ -452,6 +444,7 @@ instance ToJVM Code where
     Pop t     -> "pop" ++ suffix t
     Return t  -> prefix t ++ "return"
     Call f    -> "invokestatic " ++ toJVM f
+    Dup       -> "dup"
 
     IConst i  -> "ldc " ++ show i
 
@@ -467,6 +460,10 @@ instance ToJVM Code where
     IfGt l    -> "ifgt " ++ show l
     IfGte l   -> "ifge " ++ show l
     GoTo l    -> "goto " ++ show l
+
+    IfCmpEq l -> "if_icmpeq " ++ show l
+    IfCmpLt l -> "if_icmplt " ++ show l
+    IfCmpLe l -> "if_icmple " ++ show l
 
 -- | Type-prefix for JVM instructions.
 prefix :: Type -> String
