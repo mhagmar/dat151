@@ -99,20 +99,36 @@ eval e = case e of
 
   EApp f e  -> do
     vf <- eval f
-    ve <- eval e
     case vf of
-      VFun x f' env -> inEnv (Map.insert x ve env) $ eval f'
+      VFun x f' env -> do
+        stg <- asks cxtStrategy
+        case stg of
+          CallByValue -> do
+            ve <- eval e
+            inEnv (Map.insert x ve env) $ eval f'
+          CallByName -> do
+            env' <- asks cxtEnv
+            inEnv (Map.insert x (VFun x e env') env) $ eval f'
       VInt{}        -> fail $ "Applying non-function"
 
-  EAdd e e' -> todo
-  ESub e e' -> todo
-  ELt  e e' -> todo
-  EIf c t e -> todo
+  EAdd e e' ->do
+    (VInt v)  <- eval e
+    (VInt v') <- eval e'
+    return $ VInt (v + v')
 
+  ESub e e' -> do
+    (VInt v)  <- eval e
+    (VInt v') <- eval e'
+    return $ VInt (v - v')
 
+  ELt  e e' -> do
+    (VInt v)  <- eval e
+    (VInt v') <- eval e'
+    if v < v' then return $ VInt 1 else return $ VInt 0
 
-
-
+  EIf c t e -> do
+    (VInt con) <- eval c
+    if con == 1 then eval t else eval e
 
 
 -- ** Managing the environment
