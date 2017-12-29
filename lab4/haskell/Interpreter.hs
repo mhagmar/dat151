@@ -83,7 +83,15 @@ eval e = case e of
     -- Look in the local environment
     env <- asks cxtEnv
     case Map.lookup x env of
-      Just v -> return v
+      Just v ->  do
+        stg <- asks cxtStrategy
+        case stg of
+          CallByValue -> return v
+          CallByName -> case v of
+            VInt{} -> return v
+            VFun x f env' -> do
+                inEnv env' $ eval f
+
       Nothing -> do
         -- Look in the global signature
         sig <- asks cxtSig
@@ -107,8 +115,8 @@ eval e = case e of
             ve <- eval e
             inEnv (Map.insert x ve env) $ eval f'
           CallByName -> do
-            env' <- asks cxtEnv
-            inEnv (Map.insert x (VFun x e env') env) $ eval f'
+            ce <- eval (EAbs x e)
+            inEnv (Map.insert x ce env) $ eval f'
       VInt{}        -> fail $ "Applying non-function"
 
   EAdd e e' ->do
