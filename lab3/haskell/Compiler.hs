@@ -174,7 +174,10 @@ compileFun def@(DFun t f args ss) = do
 
   -- output code, indented by 2
   tell $ map (\ s -> if null s then s else "  " ++ s) w
-  tell ["  return"]
+  case t of
+    Type_void -> tell ["  return"]
+    otherwise -> if f == (Id "main") then tell ["  ireturn"] else tell[""]
+
   -- function footer
   tell [ "", ".end method"]
 
@@ -572,9 +575,8 @@ instance ToJVM Label where
 newVar :: Id -> Type -> Compile ()
 newVar x t = do
     c:cs <- gets cxt
-    L i <- getLabel
     ll <- gets limitLocals
-    modify $ \ st -> st {cxt = ((Map.insert x (i, t) c ):cs),
+    modify $ \ st -> st {cxt = ((Map.insert x (ll, t) c ):cs),
                          limitLocals = ll + 1}
 
 
