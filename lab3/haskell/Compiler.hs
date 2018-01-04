@@ -92,6 +92,8 @@ data Code
   | IfCmpEq Label
   | IfCmpLt Label
   | IfCmpLe Label
+  | IfCmpGt Label
+  | IfCmpGe Label
   | IfLte Label
   | IfGt Label
   | IfGte Label
@@ -212,6 +214,7 @@ compileStm s = do
     SWhile exp stm -> do
         test <- getLabel
         end <- getLabel
+        tell [";; WHILE"]
         emit (Lab test)
         compileExp exp
         newBlock
@@ -220,7 +223,7 @@ compileStm s = do
         exitBlock
         emit (GoTo test)
         emit (Lab end)
-
+        tell [";; END WHILE"]
 
     SBlock stms -> do
         newBlock
@@ -231,16 +234,19 @@ compileStm s = do
         ifLabel <- getLabel
         elseLabel <- getLabel
         compileExp exp
+        tell [";; IF"]
         emit (IfEq elseLabel)
         newBlock
         compileStm stm1
         exitBlock
         emit (GoTo ifLabel)
+        tell [";; ELSE"]
         emit (Lab elseLabel)
         newBlock
         compileStm stm2
         exitBlock
         emit (Lab ifLabel)
+        tell [";; END IF"]
 
 -- | Compiling and expression.
 
@@ -314,65 +320,20 @@ compileExp = \case
       emit (Sub t)
 
     ELt t exp1 exp2 -> do
-        true <- getLabel
-        end  <- getLabel
-        compileExp exp1
-        compileExp exp2
-        emit (IfCmpLt true)
-        emit (IConst 0)
-        emit (GoTo end)
-        emit (Lab true)
-        emit (IConst 1)
-        emit (Lab end)
+        compareExp exp1 exp2 IfCmpLt
 
 
     EGt t exp1 exp2 -> do
-        true <- getLabel
-        end  <- getLabel
-        compileExp exp2
-        compileExp exp1
-        emit (IfCmpLt true)
-        emit (IConst 0)
-        emit (GoTo end)
-        emit (Lab true)
-        emit (IConst 1)
-        emit (Lab end)
+        compareExp exp1 exp2 IfCmpGt
 
     ELtEq t exp1 exp2 -> do
-        true <- getLabel
-        end  <- getLabel
-        compileExp exp1
-        compileExp exp2
-        emit (IfCmpLe true)
-        emit (IConst 0)
-        emit (GoTo end)
-        emit (Lab true)
-        emit (IConst 1)
-        emit (Lab end)
+        compareExp exp1 exp2 IfCmpLe
 
     EGtEq t exp1 exp2 -> do
-        true <- getLabel
-        end  <- getLabel
-        compileExp exp2
-        compileExp exp1
-        emit (IfCmpLe true)
-        emit (IConst 0)
-        emit (GoTo end)
-        emit (Lab true)
-        emit (IConst 1)
-        emit (Lab end)
+        compareExp exp1 exp2 IfCmpGe
 
     EEq t exp1 exp2 -> do
-        true <- getLabel
-        end  <- getLabel
-        compileExp exp1
-        compileExp exp2
-        emit (IfCmpEq true)
-        emit (IConst 0)
-        emit (GoTo end)
-        emit (Lab true)
-        emit (IConst 1)
-        emit (Lab end)
+        compareExp exp1 exp2 IfCmpEq
 
     ENEq t exp1 exp2 -> do
         true <- getLabel
@@ -416,6 +377,20 @@ compileExp = \case
 
     e -> nyi e
 
+compareExp :: Exp -> Exp -> (Label -> Code) -> Compile ()
+compareExp exp1 exp2 cmp = do
+                tell [";; COMP"]
+                true <- getLabel
+                end  <- getLabel
+                compileExp exp1
+                compileExp exp2
+                emit (cmp true)
+                emit (IConst 0)
+                emit (GoTo end)
+                emit (Lab true)
+                emit (IConst 1)
+                emit (Lab end)
+                tell [";; END COMP"]
 ---------------------------------------------------------------------------
 -- * Code emission
 ---------------------------------------------------------------------------
@@ -475,6 +450,8 @@ instance ToJVM Code where
     IfCmpEq l -> "if_icmpeq " ++ show l
     IfCmpLt l -> "if_icmplt " ++ show l
     IfCmpLe l -> "if_icmple " ++ show l
+    IfCmpGt l -> "if_icmpgt " ++ show l
+    IfCmpGe l -> "if_icmpge " ++ show l
 
 -- | Type-prefix for JVM instructions.
 prefix :: Type -> String
