@@ -162,8 +162,10 @@ compileFun def@(DFun t f args ss) = do
   mapM_ (\ (ADecl t' x) -> newVar x t') args
 
   -- compile statements
+  newBlock
   w <- grabOutput $ do
     mapM_ compileStm ss
+  exitBlock
 
   -- output limits
   ll <- gets limitLocals
@@ -212,8 +214,10 @@ compileStm s = do
         end <- getLabel
         emit (Lab test)
         compileExp exp
+        newBlock
         emit (IfEq end)
         compileStm stm
+        exitBlock
         emit (GoTo test)
         emit (Lab end)
 
@@ -228,10 +232,14 @@ compileStm s = do
         elseLabel <- getLabel
         compileExp exp
         emit (IfEq elseLabel)
+        newBlock
         compileStm stm1
+        exitBlock
         emit (GoTo ifLabel)
         emit (Lab elseLabel)
+        newBlock
         compileStm stm2
+        exitBlock
         emit (Lab ifLabel)
 
 -- | Compiling and expression.
